@@ -5,7 +5,8 @@
             :url "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[org.clojure/clojure "1.11.1"]
                  [aleph "0.7.1"]
-                 [org.clj-commons/gloss "0.3.6"]]
+                 [org.clj-commons/gloss "0.3.6"]
+                 [manifold "0.4.2"]]
   :repl-options {:init-ns gs-clj.core}
   :main gs-clj.core)
 
