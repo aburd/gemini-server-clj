@@ -1,4 +1,5 @@
 (ns gs-clj.server
+  (:import [java.util.concurrent TimeoutException])
   (:require [aleph.tcp :as tcp]
             [aleph.netty :as netty]
             [gloss.io :as io]
@@ -34,61 +35,70 @@
 
 ; TODO: Check uri better
 (defn gemini-uri? [uri]
-  (string/starts-with? uri "gemini://"))
+  (and
+   (string/starts-with? uri "gemini://")
+   (string/ends-with? uri gemini/clrf)))
+
+(defn handle-tcp-error
+  [err stream msg]
+  (log/error err)
+  (s/put! stream (headers/permanent-failure msg))
+  (s/close! stream))
 
 (defn wrap-tcp-stream
   [gemini-req-handler-fn]
   (fn [s info]
     (log/debug "Connection established: " info)
 
-    (d/timeout!
-      ;; take a message, and define a default value that tells us if the connection is closed
-     (-> (s/take! s ::none)
+    (d/loop [req ""]
+        ;; take a message, and define a default value that tells us if the connection is closed
+      (-> (s/take! s ::none)
 
-         (d/chain
+          (d/chain
 
-          ;; first, check if there even was a message, continue processing
-          (fn [msg]
-            (log/debug "msg" msg)
-            (if (= ::none msg)
-              (throw (new Exception "no request"))
-              msg))
+           ;; first, check if there even was a message
+           (fn [msg]
+             (if (= ::none msg)
+               ::none
+               (str req msg)))
 
-          ;; check that the request is valid
-          (fn [maybe-uri]
-            (log/debug "uri?" maybe-uri)
-            (if (gemini-uri? maybe-uri)
-              (throw (new Exception (str "invalid gemini uri: " maybe-uri)))
-              maybe-uri))
+           ;; check that the request is valid
+           ;; if so, process on another thread
+           (fn [maybe-uri]
+             (log/debug "uri?" maybe-uri)
+             (d/timeout!
+              (d/future {:req maybe-uri
+                         :result
+                         (when (gemini-uri? maybe-uri)
+                           (gemini-req-handler-fn maybe-uri))})
+              timeout-ms))
 
-          ;; once we have a valid uri; process the uri on another thread
-          (fn [uri]
-            (log/debug "decoded uri: " uri)
-            (d/future (gemini-req-handler-fn uri)))
+           ;; if there was a success result, we write it to the stream
+           (fn [{:keys [req result]}]
+             (log/debug "req: " req)
+             (log/debug "gemini result: " result)
+             {:req req
+              :result (when-not (nil? result)
+                        (let [{:keys [header body success?]} result]
+                          (log/debug header body success?)
+                          @(s/put! s header)
+                          (when (true? success?)
+                            @(s/put! s body))))})
 
-          ;; once we generate a response, write it back to the client
-          (fn [args]
-            (log/info args))
+           ;; close the connection on success
+           (fn [{:keys [req result]}]
+             (when result
+               (s/close! s))
+             (when (not= req ::none)
+               (d/recur req))))
 
-          ; (fn [{:keys [header body success?]}]
-          ;   (log/debug (str "gemini response: " header))
-          ;   (s/put! s header)
-          ;   (when (true? success?)
-          ;     (s/put! s body)))
-
-           ;; regardless, close the connection
-          (fn []
-            (s/close! s)))
-
-          ;; if there were any issues on the far end, send a stringified exception back
-          ;; and close the connection
-         (d/catch
-          (fn [ex]
-            (log/error ex)
-            ; TODO: Give better error messages
-            (s/put! s (headers/permanent-failure "An unknown error occurred"))
-            (s/close! s))))
-     timeout-ms)))
+            ;; if there were any issues on the far end, send a stringified exception back
+            ;; and close the connection
+          (d/catch
+           TimeoutException
+           #(handle-tcp-error % s "The request has timed out"))
+          (d/catch
+           #(handle-tcp-error % s "An unknown error occurred"))))))
 
 (defn gemini-req-handler
   "Handles a gemini requests"
