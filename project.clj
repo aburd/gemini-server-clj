@@ -8,7 +8,8 @@
                  [org.clj-commons/gloss "0.3.6"]
                  [manifold "0.4.2"]
                  [org.clj-commons/pretty "2.2.1"]
-                 [com.taoensso/timbre "6.3.1"]]
+                 [com.taoensso/timbre "6.3.1"]
+                 [org.clojure/tools.cli "1.0.219"]]
   :repl-options {:init-ns gs-clj.core}
   :main gs-clj.core)
 

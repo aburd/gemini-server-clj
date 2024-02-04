@@ -3,6 +3,7 @@
   (:require [aleph.tcp :as tcp]
             [aleph.netty :as netty]
             [gloss.io :as io]
+            [gloss.core :as gloss]
             [manifold.deferred :as d]
             [manifold.stream :as s]
             [clojure.java.io :as java-io]
@@ -11,26 +12,20 @@
             [gs-clj.gemini :as gemini]
             [gs-clj.headers :as headers]))
 
-; TODO: Add TLS
-(def ssl-context
-  (netty/ssl-client-context
-   {:private-key (java-io/file (java-io/resource "app.key"))
-    :certificate-chain (java-io/file (java-io/resource "app.pem"))}))
+(def protocol
+  (gloss/compile-frame
+   (gloss/string :utf-8)))
 
-(defn wrap-server-stream
-  "wrap the server connection stream with gloss protocol to handle 
-  sending/receiving bytes"
-  [req-protocol res-protocol s]
+(defn wrap-duplex-stream
+  [protocol s]
   (let [out (s/stream)]
     (s/connect
-     (s/map #(io/encode req-protocol %) out)
+     (s/map #(io/encode protocol %) out)
      s)
-
     (s/splice
      out
-     (io/decode-stream s res-protocol))))
+     (io/decode-stream s protocol))))
 
-; TODO: Is there a specification for timeouts?
 (def timeout-ms 10000)
 
 ; TODO: Check uri better
@@ -51,7 +46,7 @@
     (log/debug "Connection established: " info)
 
     (d/loop [req ""]
-        ;; take a message, and define a default value that tells us if the connection is closed
+      ;; take a message, and define a default value that tells us if the connection is closed
       (-> (s/take! s ::none)
 
           (d/chain
@@ -108,18 +103,28 @@
    :body "Hello there"
    :success? true})
 
+(defn server->ssl-context
+  [key cert]
+  (netty/ssl-server-context
+   {:private-key (java-io/file key)
+    :certificate-chain (java-io/file cert)}))
+
 (defn start-server
   "Starts the server and applies the tcp-stream to the stream-handler.
   port - server port"
   [stream-handler & {:keys [port] :or {port gemini/default-port}}]
+  (log/debug (str "Starting server on port <" port ">"))
   (tcp/start-server
    (fn [s info]
      (stream-handler
-      (wrap-server-stream gemini/request-protocol gemini/response-protocol s)
+      (wrap-duplex-stream protocol s)
       info))
-   {:port port}))
+   {:port port
+    :ssl-context (server->ssl-context
+                  (java-io/resource "app.key")
+                  (java-io/resource "app.pem"))}))
 
-(defn start
+(defn start!
   "Starts the server with the gemini request handler fn. wrap-tcp-stream will stream valid uris to the handler."
   [& opts]
   (start-server (wrap-tcp-stream gemini-req-handler) opts))
