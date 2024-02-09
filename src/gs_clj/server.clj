@@ -95,13 +95,26 @@
           (d/catch
            #(handle-tcp-error % s "An unknown error occurred"))))))
 
+(defn resolve-path
+  [^String path]
+  (log/debug "resolving:" path)
+  (if (= path "/")
+    "/index.gmi"
+    path))
+
+(defn get-file-body [file-path]
+  (log/debug "Getting file at:", file-path)
+  (slurp (java-io/resource (str "public" file-path))))
+
 (defn gemini-req-handler
   "Handles a gemini requests"
   [^String uri]
   (log/debug "Got a URI! " uri)
-  {:header (headers/success "text/gemini")
-   :body "Hello there"
-   :success? true})
+  (let [path (string/trim (string/replace uri "gemini://localhost", ""))]
+    (log/debug "path:" path)
+    {:header (headers/success "text/gemini")
+     :body (get-file-body (resolve-path path))
+     :success? true}))
 
 (defn server->ssl-context
   [key cert]
