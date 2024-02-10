@@ -1,5 +1,0 @@
-# Welcome
-
-Hello world
-
-=> /other.gmi Other Link!
