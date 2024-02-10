@@ -1,22 +1,24 @@
 (ns gs-clj.cli
-  (:require [gs-clj.gemini :as gemini]
-            [clojure.string :as string]
-            [clojure.tools.cli :refer [parse-opts]])
+  (:require [clojure.string :as string]
+            [clojure.tools.cli :refer [parse-opts]]
+            [clojure.java.io :as io])
   (:gen-class))
 
 (def -cli-options
   ;; An option with a required argument
   [["-p" "--port PORT" "Port number"
-    :default gemini/default-port
     :parse-fn #(Integer/parseInt %)
     :validate [#(< 0 % 0x10000) "Must be a number between 0 and 65536"]]
    ;; A non-idempotent option (:default is applied first)
    ["-v" "--verbose" "Verbose logging"]
    ["-l" "--log-level LEVEL" "Level of log 0-6, 0 is trace"
     :id :log-level
-    :default 2
     :parse-fn #(Integer/parseInt %)
     :validate [#(<= 0 % 6) "Must be a number between 0 and 6"]]
+   ["-c" "--config CONFIG" "path to config.edn"
+    :id :config
+    :default "resources/config.edn"
+    :validate [#(.exists (io/file %)) "Config file does not exist"]]
    ["-h" "--help"]])
 
 (defn- usage [options-summary]

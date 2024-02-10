@@ -2,6 +2,8 @@
   (:require [gs-clj.server :as server]
             [gs-clj.request :as request]
             [gs-clj.cli :as cli]
+            [clojure.java.io :as io]
+            [clojure.edn :as edn]
             [taoensso.timbre :as log]
             [integrant.core :as ig])
   (:gen-class))
@@ -21,10 +23,10 @@
                   :report])
 
 (defn- log-level
-  [{:keys [log-level verbose]}]
+  [{:keys [level verbose]}]
   (get -log-levels (if verbose
                      0
-                     log-level)))
+                     level)))
 
 (defmethod ig/init-key ::server [_ {:keys [port handler ssl-config public-path]}]
   (log/info (str "Starting server on port <" port ">"))
@@ -35,26 +37,41 @@
   (.close server))
 
 (defmethod ig/init-key ::logger [_ {:keys [level]}]
-  (log/debug "log-level" level)
-  (log/set-min-level! level))
+  (log/set-min-level! level)
+  (log/debug "log-level" level))
+
+(defn get-file-config
+  [path]
+  (edn/read (java.io.PushbackReader. (io/reader path))))
+
+(defn merge-options
+  "Merges the two configs together, cli-config should always override file-config"
+  [file-config cli-config]
+  {:port (or (:port cli-config) (get-in file-config [:server :port]))
+   :ssl-config {:key (get-in file-config [:server :ssl-config :key])
+                :cert (get-in file-config [:server :ssl-config :cert])}
+   :public-path (get-in file-config [:server :public-path])
+   :log-level (log-level
+               {:level (or (:log-level cli-config)
+                           (.indexOf -log-levels (get-in file-config [:logger :level])))
+                :verbose (:verbose cli-config)})})
 
 (defn start-server
-  [options]
-  (let [config {::server {:port (:port options)
+  [{:keys [port ssl-config public-path log-level]}]
+  (let [config {::server {:port port
                           :handler request/handle!
-                          :ssl-config {:key (or (:key options) "resources/certs/app.key")
-                                       :cert (or (:cert options) "resources/certs/app.pem")}
-                          :public-path "resources/public"
+                          :ssl-config ssl-config
+                          :public-path public-path
                           :logger (ig/ref ::logger)}
-                ::logger {:level (log-level options)}}]
+                ::logger {:level log-level}}]
     (reset! system (ig/init config))
     (log/info "gemini-server-clj is ready for connections")))
 
 ; (start-server {:port 1965
-;                :log-level 0
 ;                :ssl-config {:key "resources/certs/app.key"
-;                             :cert "resources/certs/app.pem"}})
-
+;                             :cert "resources/certs/app.pem"}
+;                :public-path "resources/public"
+;                :log-level :debug})
 ; (ig/halt! @system)
 
 (defn -main [& args]
@@ -62,4 +79,7 @@
     (if exit-message
       (exit (if ok? 0 1) exit-message)
       (case action
-        "start"  (start-server options)))))
+        "start"  (start-server
+                  (merge-options
+                   (get-file-config (:config options))
+                   options))))))

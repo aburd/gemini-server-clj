@@ -1,0 +1,5 @@
+{:server {:port 1965
+          :ssl-config {:key "resources/certs/app.key"
+                       :cert "resources/certs/app.pem"}
+          :public-path "resources/public"}
+ :logger {:level :info}}
