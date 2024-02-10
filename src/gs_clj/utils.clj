@@ -14,4 +14,4 @@
   (alength (.getBytes s "UTF-8")))
 
 (defn byte-len-within [s len]
-  (> (byte-len s) len))
+  (< (byte-len s) len))
