@@ -9,7 +9,9 @@
                  [manifold "0.4.2"]
                  [org.clj-commons/pretty "2.2.1"]
                  [com.taoensso/timbre "6.3.1"]
-                 [org.clojure/tools.cli "1.0.219"]]
+                 [org.clojure/tools.cli "1.0.219"]
+                 [integrant "0.8.1"]
+                 [lambdaisland/uri "1.19.155"]]
   :repl-options {:init-ns gs-clj.core}
   :main gs-clj.core)
 

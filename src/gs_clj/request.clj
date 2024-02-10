@@ -5,35 +5,34 @@
    [taoensso.timbre :as log]
    [gs-clj.gemini :refer [clrf max-request-bytes]]
    [gs-clj.headers :as headers]
-   [gs-clj.utils :refer [byte-len-within]]))
+   [gs-clj.utils :refer [byte-len-within pick]]
+   [lambdaisland.uri :as uri]))
+
+(defn- is-ip-address? [s]
+  (not (nil? (re-matches #"\d+\.\d+\.\d+\.\d+" s))))
 
 ; REQUEST
-(defn gemini-uri? [s]
-  (and
-   (byte-len-within s max-request-bytes)
-   (s/starts-with? s "gemini://")
-   (s/ends-with? s clrf)))
-
-; TODO: parse URI properly
-(defn- parse-uri-path
-  [uri]
-  (s/trim (s/replace uri "gemini://localhost", "")))
-
-(defn from-str
-  "Takes a string as defined in [gemini network spec](https://geminiprotocol.net/docs/protocol-specification.gmi) and returns back an request map"
-  [s]
-  (when (gemini-uri? s)
-    {:uri s
-     :path (parse-uri-path s)}))
+(defn from-str [s]
+  (when (s/ends-with? s clrf)
+    (let [u (uri/parse (s/trim s))
+          uri (when (and
+                     (byte-len-within s max-request-bytes)
+                     (= (:scheme u) "gemini")
+                     (every? nil? (vec (pick u :user :password :fragment)))
+                     ((comp not is-ip-address?) (:host u)))
+                (dissoc u :user :password :fragment))]
+      (when (not (nil? uri))
+        {:scheme (:scheme uri)
+         :host (:host uri)
+         :port (:port uri)
+         :path (if (nil? (:path uri)) "/" (:path uri))
+         :query (:query uri)}))))
 
 ; RESPONSE
-
 (defn- resolve-file-path
   [^String uri-path]
   (condp = uri-path
     "/" "/index.gmi"
-    "" "/index.gmi"
-    nil "/index.gmi"
     uri-path))
 
 (defn- get-file-body [file-path]

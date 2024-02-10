@@ -7,7 +7,7 @@
             [clojure.tools.cli :refer [parse-opts]])
   (:gen-class))
 
-(def cli-options
+(def -cli-options
   ;; An option with a required argument
   [["-p" "--port PORT" "Port number"
     :default gemini/default-port
@@ -22,7 +22,7 @@
     :validate [#(<= 0 % 6) "Must be a number between 0 and 6"]]
    ["-h" "--help"]])
 
-(defn usage [options-summary]
+(defn- usage [options-summary]
   (->> ["Gemini server"
         ""
         "Usage: gemini-server-clj [options] ACTION"
@@ -34,7 +34,7 @@
         "  start    Start a new server"]
        (string/join \newline)))
 
-(defn error-msg [errors]
+(defn- error-msg [errors]
   (str "The following errors occurred while parsing your command:\n\n"
        (string/join \newline errors)))
 
@@ -43,7 +43,7 @@
   should exit (with an error message, and optional ok status), or a map
   indicating the action the program should take and the options provided."
   [args]
-  (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)]
+  (let [{:keys [options arguments errors summary]} (parse-opts args -cli-options)]
     (cond
       (:help options)
       {:exit-message (usage summary) :ok? true}
@@ -56,22 +56,22 @@
       :else ; failed custom validation => exit with usage summary
       {:exit-message (usage summary)})))
 
-(defn exit [status msg]
+(defn- exit [status msg]
   (println msg)
   (System/exit status))
 
-(def log-levels [:trace
-                 :debug
-                 :info
-                 :warn
-                 :error
-                 :fatal
-                 :report])
+(def -log-levels [:trace
+                  :debug
+                  :info
+                  :warn
+                  :error
+                  :fatal
+                  :report])
 
-(defn log-level [{:keys [log-level verbose]}]
-  (get log-levels (if verbose
-                    0
-                    log-level)))
+(defn- log-level [{:keys [log-level verbose]}]
+  (get -log-levels (if verbose
+                     0
+                     log-level)))
 
 (defn -main [& args]
   (let [{:keys [action options exit-message ok?]} (validate-args args)]

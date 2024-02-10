@@ -67,8 +67,8 @@
                (log/debug "gemini-req:" gemini-req)
                (d/timeout!
                 (d/future {:maybe-uri maybe-uri
-                           :gemini-res (if-let [r (request/from-str maybe-uri)]
-                                         (gemini-req-handler r))})
+                           :gemini-res (when (not (nil? gemini-req))
+                                         (gemini-req-handler gemini-req))})
                 timeout-ms)))
 
            ;; if there was a success result, we write it to the stream

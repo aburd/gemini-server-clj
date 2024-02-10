@@ -15,3 +15,8 @@
 
 (defn byte-len-within [s len]
   (< (byte-len s) len))
+
+(defn pick
+  "return a sequence of the vals at the keys of the provided map"
+  [m & ks]
+  (vals (select-keys m ks)))
