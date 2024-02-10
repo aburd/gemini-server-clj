@@ -40,7 +40,7 @@
 (defn wrap-tcp-stream
   "Returns a tcp-stream handler. Takes a `gemini-req-handler` which the stream handler will pass
   gemini requests to."
-  [gemini-req-handler]
+  [gemini-req-handler {:keys [public-path]}]
   (fn [s info]
     (log/debug (emphasize "start"))
     (log/debug (str "Connection established with [" (:remote-addr info)) "]")
@@ -68,7 +68,9 @@
                (d/timeout!
                 (d/future {:maybe-uri maybe-uri
                            :gemini-res (when (not (nil? gemini-req))
-                                         (gemini-req-handler gemini-req))})
+                                         (gemini-req-handler
+                                          gemini-req
+                                          {:public-path public-path}))})
                 timeout-ms)))
 
            ;; if there was a success result, we write it to the stream
@@ -108,33 +110,37 @@
              (s/close! s)))))))
 
 (defn- server->ssl-context
-  [key cert]
+  [{:keys [key cert]}]
   (netty/ssl-server-context
    {:private-key (java-io/file key)
     :certificate-chain (java-io/file cert)}))
 
 (defn- start-tcp-server!
   "Starts the server and applies the tcp-stream to the stream-handler.
-  port - server port"
-  [tcp-stream-handler & {:keys [port ssl-context]
-                         :or {port gemini/default-port
-                              ssl-context (server->ssl-context
-                                           (java-io/resource "app.key")
-                                           (java-io/resource "app.pem"))}}]
-  (log/debug (str "Starting server on port <" port ">"))
+  port - server port, defaults to gemini port"
+  [tcp-stream-handler ssl-config {:keys [port]
+                                  :or {port gemini/default-port}}]
   (tcp/start-server
    (fn [s info]
      (tcp-stream-handler
       (wrap-duplex-stream protocol s)
       info))
    {:port port
-    :ssl-context ssl-context}))
+    :ssl-context (server->ssl-context ssl-config)}))
 
 (defn start!
   "Starts the server with the gemini request handler fn. wrap-tcp-stream will stream valid uris to the handler.
 
    === Options ===
-   * port - the port to listen at
-   * ssl-context - a netty/ssl-server-context"
-  [gemini-handler & opts]
-  (start-tcp-server! (wrap-tcp-stream gemini-handler) opts))
+   * port - the port to listen on, defaults to gemini port
+   * ssl-config - map with paths to ssl :key and :cert for netty server.
+        defaults to :key resources/app.key
+                    :cert resources/app.pem
+   * public-path - a path to the public directory where the server's public files are stored"
+  [gemini-handler ssl-config {:keys [public-path port]
+                              :or {port gemini/default-port
+                                   public-path "resources/public"}}]
+  (start-tcp-server!
+   (wrap-tcp-stream gemini-handler {:public-path public-path})
+   ssl-config
+   {:port port}))

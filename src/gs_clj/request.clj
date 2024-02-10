@@ -30,14 +30,15 @@
 
 ; RESPONSE
 (defn- resolve-file-path
-  [^String uri-path]
-  (condp = uri-path
-    "/" "/index.gmi"
-    uri-path))
+  [^String uri-path public-path]
+  (let [path (condp = uri-path
+               "/" "/index.gmi"
+               uri-path)]
+    (str public-path path)))
 
 (defn- get-file-body [file-path]
   (log/debug "Getting file at:", file-path)
-  (slurp (io/resource (str "public" file-path))))
+  (slurp file-path))
 
 ; TODO: Not implemented
 (defn- handler-type
@@ -50,17 +51,17 @@
     :else :resource))
 
 ; TODO: Not-implemented
-(defn- handle-input-req [_req]
+(defn- handle-input-req [_req & _opts]
   {:header (headers/input)
    :body nil})
 
 ; TODO: Not-implemented
-(defn- handle-resource-req [{:keys [path]}]
+(defn- handle-resource-req [{:keys [path] :as _req} {:keys [public-path] :as _opts}]
   {:header (headers/success "text/gemini")
-   :body (get-file-body (resolve-file-path path))})
+   :body (get-file-body (resolve-file-path path public-path))})
 
 ; TODO: Not-implemented
-(defn- handle-client-certificates-req [_req]
+(defn- handle-client-certificates-req [_req & _opts]
   {:header (headers/certificate-not-valid)
    :body nil})
 
@@ -71,8 +72,8 @@
 
 (defn handle!
   "Handles a gemini request, returns a gemini response"
-  [req]
+  [req opts]
   (let [handler-fn (get req-handlers (handler-type (:path req)))
-        res (handler-fn req)]
+        res (handler-fn req opts)]
     {:header (headers/to-str (:header res))
      :body (:body res)}))
