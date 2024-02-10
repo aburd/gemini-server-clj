@@ -2,10 +2,8 @@
   (:require [gs-clj.gemini :refer [max-response-meta-bytes
                                    statuses
                                    clrf]]
+            [gs-clj.utils :refer [byte-len-within]]
             [clojure.spec.alpha :as spec]))
-
-(defn byte-len [s]
-  (alength (.getBytes s "UTF-8")))
 
 (defn valid-status? [status]
   (boolean (get statuses status)))
@@ -20,7 +18,7 @@
   [{:keys [status code meta] :or {meta ""}}]
   {:pre [(or (spec/valid? valid-status? status)
              (spec/valid? valid-code? code))]}
-  (if (> (byte-len meta) max-response-meta-bytes)
+  (if (byte-len-within meta max-response-meta-bytes)
     (throw (new Exception (str "size of meta in gemini response must be " max-response-meta-bytes " bytes or less")))
     (str
      (or (statuses status) code)

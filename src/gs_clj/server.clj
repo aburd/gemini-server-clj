@@ -84,7 +84,7 @@
 
            ;; close the connection on success
            (fn [{:keys [maybe-uri result]}]
-             (log/debug {:maybe-uri maybe-uri :result result})
+             (log/debug "successfully sent bytes?" result)
              (when result
                (do
                  (log/debug (emphasize "end"))

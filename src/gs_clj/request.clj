@@ -1,15 +1,16 @@
 (ns gs-clj.request
   (:require
    [clojure.string :as s]
-   [gs-clj.gemini :refer [clrf max-request-bytes]]
    [clojure.java.io :as io]
    [taoensso.timbre :as log]
-   [gs-clj.headers :as headers]))
+   [gs-clj.gemini :refer [clrf max-request-bytes]]
+   [gs-clj.headers :as headers]
+   [gs-clj.utils :refer [byte-len-within]]))
 
 ; REQUEST
-; TODO check if within max-request-bytes
 (defn gemini-uri? [s]
   (and
+   (byte-len-within s max-request-bytes)
    (s/starts-with? s "gemini://")
    (s/ends-with? s clrf)))
 
