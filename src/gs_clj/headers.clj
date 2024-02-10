@@ -18,7 +18,7 @@
   [{:keys [status code meta] :or {meta ""}}]
   {:pre [(or (spec/valid? valid-status? status)
              (spec/valid? valid-code? code))]}
-  (if (byte-len-within meta max-response-meta-bytes)
+  (if (not (byte-len-within meta max-response-meta-bytes))
     (throw (new Exception (str "size of meta in gemini response must be " max-response-meta-bytes " bytes or less")))
     (str
      (or (statuses status) code)

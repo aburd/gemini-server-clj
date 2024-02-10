@@ -29,12 +29,13 @@
 
 (def timeout-ms 10000)
 
-(defn- handle-tcp-error!
-  [err stream msg]
-  (do
-    (log/error err)
-    (s/put! stream (headers/permanent-failure msg))
-    (s/close! stream)))
+(defn write-response
+  [s res]
+  (let [{:keys [header body]} res]
+    (log/debug {:header header :body body})
+    @(s/put! s header)
+    (when-not (nil? body)
+      @(s/put! s body))))
 
 (defn wrap-tcp-stream
   "Returns a tcp-stream handler. Takes a `gemini-req-handler` which the stream handler will pass
@@ -76,11 +77,7 @@
              {:maybe-uri maybe-uri
               :result (when-not (nil? gemini-res)
                         (log/debug "Successfully handled request")
-                        (let [{:keys [header body]} gemini-res]
-                          (log/debug {:header header :body body})
-                          @(s/put! s header)
-                          (when-not (nil? body)
-                            @(s/put! s body))))})
+                        (write-response s gemini-res))})
 
            ;; close the connection on success
            (fn [{:keys [maybe-uri result]}]
@@ -96,9 +93,19 @@
             ;; and close the connection
           (d/catch
            TimeoutException
-           #(handle-tcp-error! % s "The request has timed out"))
+           (fn [e]
+             (log/error e)
+             (write-response s {:header
+                                (headers/to-str
+                                 (headers/permanent-failure "The request has timed out"))})
+             (s/close! s)))
           (d/catch
-           #(handle-tcp-error! % s "An unknown error occurred"))))))
+           (fn [e]
+             (log/error e)
+             (write-response s {:header
+                                (headers/to-str
+                                 (headers/permanent-failure "An unknown error occurred"))})
+             (s/close! s)))))))
 
 (defn- server->ssl-context
   [key cert]
