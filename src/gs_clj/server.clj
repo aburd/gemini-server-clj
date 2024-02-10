@@ -7,16 +7,17 @@
             [manifold.deferred :as d]
             [manifold.stream :as s]
             [clojure.java.io :as java-io]
-            [clojure.string :as string]
             [taoensso.timbre :as log]
             [gs-clj.gemini :as gemini]
-            [gs-clj.headers :as headers]))
+            [gs-clj.headers :as headers]
+            [gs-clj.request :as request]
+            [gs-clj.utils :refer [emphasize]]))
 
 (def protocol
   (gloss/compile-frame
    (gloss/string :utf-8)))
 
-(defn wrap-duplex-stream
+(defn- wrap-duplex-stream
   [protocol s]
   (let [out (s/stream)]
     (s/connect
@@ -28,29 +29,17 @@
 
 (def timeout-ms 10000)
 
-; TODO: Check uri better
-(defn gemini-uri? [uri]
-  (and
-   (string/starts-with? uri "gemini://")
-   (string/ends-with? uri gemini/clrf)))
-
-(defn handle-tcp-error
+(defn- handle-tcp-error!
   [err stream msg]
-  (log/error err)
-  (s/put! stream (headers/permanent-failure msg))
-  (s/close! stream))
-
-(defn emphasize
-  [s & {:keys [len c] :or {len 20 c '*}}]
-  (let [s-len (count s)
-        star-count (/ (- len s-len) 2)]
-    (if (> s-len len)
-      s
-      (let [stars (apply str (take star-count (repeat c)))]
-        (str stars (string/upper-case s) stars)))))
+  (do
+    (log/error err)
+    (s/put! stream (headers/permanent-failure msg))
+    (s/close! stream)))
 
 (defn wrap-tcp-stream
-  [gemini-req-handler-fn]
+  "Returns a tcp-stream handler. Takes a `gemini-req-handler` which the stream handler will pass
+  gemini requests to."
+  [gemini-req-handler]
   (fn [s info]
     (log/debug (emphasize "start"))
     (log/debug "Connection established: " info)
@@ -74,14 +63,14 @@
              (d/timeout!
               (d/future {:req maybe-uri
                          :result
-                         (when (gemini-uri? maybe-uri)
-                           (gemini-req-handler-fn maybe-uri))})
+                         (if-let [r (request/from-str maybe-uri)]
+                           (gemini-req-handler r))})
               timeout-ms))
 
            ;; if there was a success result, we write it to the stream
            (fn [{:keys [req result]}]
-             (log/debug "req: " req)
-             (log/debug "gemini result: " result)
+             (log/debug "Successfully handled request")
+             (log/debug {:req req :result result})
              {:req req
               :result (when-not (nil? result)
                         (let [{:keys [header body success?]} result]
@@ -102,81 +91,9 @@
             ;; and close the connection
           (d/catch
            TimeoutException
-           #(handle-tcp-error % s "The request has timed out"))
+           #(handle-tcp-error! % s "The request has timed out"))
           (d/catch
-           #(handle-tcp-error % s "An unknown error occurred"))))))
-
-(defn get-path
-  [uri]
-  (string/trim (string/replace uri "gemini://localhost", "")))
-
-(defn resolve-file-path
-  [^String uri-path]
-  (condp = uri-path
-    "/" "/index.gmi"
-    "" "/index.gmi"
-    nil "/index.gmi"
-    uri-path))
-
-(defn get-file-body [file-path]
-  (log/debug "Getting file at:", file-path)
-  (slurp (java-io/resource (str "public" file-path))))
-
-; TODO: Not implemented
-(defn get-handler-type
-  "get the general class of response handler type"
-  [^String path]
-  (cond
-    false :input
-    ; TODO; not sure
-    false :failure
-    ; TODO; not sure
-    false :client-certifiates
-    :else :resource))
-
-; (deftype Response [fields]
-;   Protocol)
-
-; TODO: Not-implemented
-(defn handle-input-req []
-  {:header (headers/input)
-   :body nil
-   :success? true})
-
-; TODO: Not-implemented
-(defn handle-failure-req [^String msg]
-  {:header (headers/permanent-failure msg)
-   :body nil
-   :success? true})
-
-; TODO: Not-implemented
-(defn handle-client-certificates-req [path]
-  {:header (headers/success "text/gemini")
-   :body nil
-   :success? true})
-
-; TODO: Not-implemented
-(defn handle-resource-req [uri-path]
-  {:header (headers/success "text/gemini")
-   :body (get-file-body (resolve-file-path uri-path))
-   :success? true})
-
-(def req-handlers
-  {:input handle-input-req
-   :failure handle-failure-req
-   :client-certifiates handle-client-certificates-req
-   :resource handle-resource-req})
-
-(defn gemini-req-handler
-  "Handles a gemini requests"
-  [^String uri]
-  (log/debug "Got a URI! " uri)
-  (let [path (get-path uri)
-        handler-type (get-handler-type path)
-        handler-fn (get req-handlers handler-type)]
-    (log/debug "Handling path:" path)
-    (log/debug "Handler Type:" handler-type)
-    (handler-fn path)))
+           #(handle-tcp-error! % s "An unknown error occurred"))))))
 
 (defn server->ssl-context
   [key cert]
@@ -202,4 +119,4 @@
 (defn start!
   "Starts the server with the gemini request handler fn. wrap-tcp-stream will stream valid uris to the handler."
   [& opts]
-  (start-server (wrap-tcp-stream gemini-req-handler) opts))
+  (start-server (wrap-tcp-stream request/handle!) opts))
