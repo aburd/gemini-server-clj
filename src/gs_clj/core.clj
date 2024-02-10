@@ -1,6 +1,7 @@
 (ns gs-clj.core
   (:require [gs-clj.server :as server]
             [gs-clj.gemini :as gemini]
+            [gs-clj.request :as request]
             [clojure.string :as string]
             [taoensso.timbre :as log]
             [clojure.tools.cli :refer [parse-opts]])
@@ -82,4 +83,4 @@
         (log/debug "Command line options: " options)
         ; handle action
         (case action
-          "start"  (server/start! options))))))
+          "start"  (server/start! request/handle! options))))))

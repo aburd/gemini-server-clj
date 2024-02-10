@@ -42,9 +42,11 @@
   [gemini-req-handler]
   (fn [s info]
     (log/debug (emphasize "start"))
-    (log/debug "Connection established: " info)
+    (log/debug (str "Connection established with [" (:remote-addr info)) "]")
 
-    (d/loop [req ""]
+    ; Will build up a uri from the tcp-stream
+    ; Once the uri is determined to valid, we hand it off to the gemini-req-handler
+    (d/loop [uri ""]
       ;; take a message, and define a default value that tells us if the connection is closed
       (-> (s/take! s ::none)
 
@@ -54,38 +56,41 @@
            (fn [msg]
              (if (= ::none msg)
                ::none
-               (str req msg)))
+               (str uri msg)))
 
            ;; check that the request is valid
            ;; if so, process on another thread
            (fn [maybe-uri]
-             (log/debug "uri?" maybe-uri)
-             (d/timeout!
-              (d/future {:req maybe-uri
-                         :result
-                         (if-let [r (request/from-str maybe-uri)]
-                           (gemini-req-handler r))})
-              timeout-ms))
+             (log/debug "maybe-uri:" maybe-uri)
+             (let [gemini-req (request/from-str maybe-uri)]
+               (log/debug "gemini-req:" gemini-req)
+               (d/timeout!
+                (d/future {:maybe-uri maybe-uri
+                           :gemini-res (if-let [r (request/from-str maybe-uri)]
+                                         (gemini-req-handler r))})
+                timeout-ms)))
 
            ;; if there was a success result, we write it to the stream
-           (fn [{:keys [req result]}]
-             (log/debug "Successfully handled request")
-             (log/debug {:req req :result result})
-             {:req req
-              :result (when-not (nil? result)
-                        (let [{:keys [header body success?]} result]
+           (fn [{:keys [maybe-uri gemini-res]}]
+             (log/debug "gemini-res:" gemini-res)
+             {:maybe-uri maybe-uri
+              :result (when-not (nil? gemini-res)
+                        (log/debug "Successfully handled request")
+                        (let [{:keys [header body]} gemini-res]
+                          (log/debug {:header header :body body})
                           @(s/put! s header)
-                          (when (true? success?)
+                          (when-not (nil? body)
                             @(s/put! s body))))})
 
            ;; close the connection on success
-           (fn [{:keys [req result]}]
+           (fn [{:keys [maybe-uri result]}]
+             (log/debug {:maybe-uri maybe-uri :result result})
              (when result
                (do
                  (log/debug (emphasize "end"))
                  (s/close! s)))
-             (when (and (not result) (not= req ::none))
-               (d/recur req))))
+             (when (and (not result) (not= maybe-uri ::none))
+               (d/recur maybe-uri))))
 
             ;; if there were any issues on the far end, send a stringified exception back
             ;; and close the connection
@@ -95,28 +100,34 @@
           (d/catch
            #(handle-tcp-error! % s "An unknown error occurred"))))))
 
-(defn server->ssl-context
+(defn- server->ssl-context
   [key cert]
   (netty/ssl-server-context
    {:private-key (java-io/file key)
     :certificate-chain (java-io/file cert)}))
 
-(defn start-server
+(defn- start-tcp-server!
   "Starts the server and applies the tcp-stream to the stream-handler.
   port - server port"
-  [stream-handler & {:keys [port] :or {port gemini/default-port}}]
+  [tcp-stream-handler & {:keys [port ssl-context]
+                         :or {port gemini/default-port
+                              ssl-context (server->ssl-context
+                                           (java-io/resource "app.key")
+                                           (java-io/resource "app.pem"))}}]
   (log/debug (str "Starting server on port <" port ">"))
   (tcp/start-server
    (fn [s info]
-     (stream-handler
+     (tcp-stream-handler
       (wrap-duplex-stream protocol s)
       info))
    {:port port
-    :ssl-context (server->ssl-context
-                  (java-io/resource "app.key")
-                  (java-io/resource "app.pem"))}))
+    :ssl-context ssl-context}))
 
 (defn start!
-  "Starts the server with the gemini request handler fn. wrap-tcp-stream will stream valid uris to the handler."
-  [& opts]
-  (start-server (wrap-tcp-stream request/handle!) opts))
+  "Starts the server with the gemini request handler fn. wrap-tcp-stream will stream valid uris to the handler.
+
+   === Options ===
+   * port - the port to listen at
+   * ssl-context - a netty/ssl-server-context"
+  [gemini-handler & opts]
+  (start-tcp-server! (wrap-tcp-stream gemini-handler) opts))
