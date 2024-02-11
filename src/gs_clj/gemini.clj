@@ -3,8 +3,11 @@
 (def default-port 1965)
 
 (def max-request-bytes 1024)
+
 (def max-response-meta-bytes 1024)
+
 (def clrf "\r\n")
+
 (def statuses {; input
                :input 10
                :sensitive-input 11
@@ -29,3 +32,6 @@
                :client-certificate-required 60
                :certificate-not-authorized 61
                :certificate-not-valid 62})
+
+(def mime-types {:gemini "text/gemini; charset=utf-8"
+                 :text "text/plain; charset=utf-8"})

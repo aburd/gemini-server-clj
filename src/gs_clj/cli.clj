@@ -37,6 +37,8 @@
   (str "The following errors occurred while parsing your command:\n\n"
        (string/join \newline errors)))
 
+(def valid-commands #{"start"})
+
 (defn validate-args
   "Validate command line arguments. Either return a map indicating the program
   should exit (with an error message, and optional ok status), or a map
@@ -50,7 +52,7 @@
       {:exit-message (error-msg errors)}
       ;; custom validation on arguments
       (and (= 1 (count arguments))
-           (#{"start" "stop" "status"} (first arguments)))
+           (valid-commands (first arguments)))
       {:action (first arguments) :options options}
       :else ; failed custom validation => exit with usage summary
       {:exit-message (usage summary)})))

@@ -75,11 +75,10 @@
 ; (ig/halt! @system)
 
 (defn -main [& args]
-  (let [{:keys [action options exit-message ok?]} (cli/validate-args args)]
+  (let [{:keys [action exit-message ok?] :as cli-res} (cli/validate-args args)]
     (if exit-message
       (exit (if ok? 0 1) exit-message)
-      (case action
-        "start"  (start-server
-                  (merge-options
-                   (get-file-config (:config options))
-                   options))))))
+      (let [file-options (get-file-config (get-in cli-res [:options :config]))
+            user-options (merge-options file-options (:options cli-res))]
+        (case action
+          "start"  (start-server user-options))))))

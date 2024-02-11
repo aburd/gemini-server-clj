@@ -1,9 +1,8 @@
 (ns gs-clj.request
   (:require
    [clojure.string :as s]
-   [clojure.java.io :as io]
    [taoensso.timbre :as log]
-   [gs-clj.gemini :refer [clrf max-request-bytes]]
+   [gs-clj.gemini :refer [clrf max-request-bytes mime-types]]
    [gs-clj.headers :as headers]
    [gs-clj.utils :refer [byte-len-within pick]]
    [lambdaisland.uri :as uri]))
@@ -57,7 +56,7 @@
 
 ; TODO: Not-implemented
 (defn- handle-resource-req [{:keys [path] :as _req} {:keys [public-path] :as _opts}]
-  {:header (headers/success "text/gemini")
+  {:header (headers/success (:gemini mime-types))
    :body (get-file-body (resolve-file-path path public-path))})
 
 ; TODO: Not-implemented
