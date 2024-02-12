@@ -50,7 +50,9 @@
   {:port (or (:port cli-config) (get-in file-config [:server :port]))
    :ssl-config {:key (get-in file-config [:server :ssl-config :key])
                 :cert (get-in file-config [:server :ssl-config :cert])}
-   :public-path (get-in file-config [:server :public-path])
+   :public-path (or
+                 (:public cli-config)
+                 (get-in file-config [:server :public-path]))
    :log-level (log-level
                {:level (or (:log-level cli-config)
                            (.indexOf -log-levels (get-in file-config [:logger :level])))

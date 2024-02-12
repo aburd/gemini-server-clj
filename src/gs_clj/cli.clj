@@ -19,6 +19,9 @@
     :id :config
     :default "resources/config.edn"
     :validate [#(.exists (io/file %)) "Config file does not exist"]]
+   ["-u" "--public PUBLIC_PATH" "path to your public files"
+    :id :public
+    :validate [#(.isDirectory (io/file %)) "Public path is not a directory"]]
    ["-h" "--help"]])
 
 (defn- usage [options-summary]
