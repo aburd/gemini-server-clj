@@ -30,19 +30,32 @@
 (def timeout-ms 10000)
 
 (defn write-response
-  [s res]
-  (let [{:keys [header body]} res]
-    (log/debug {:header header :body body})
-    @(s/put! s header)
-    (if (not (nil? body))
-      @(s/put! s body)
-      true)))
+  [s s-bytes res]
+  (let [{:keys [header body]} res
+        header-s (headers/to-str header)
+        {:keys [utf8 bytes]} body]
+    (log/debug "RESPONSE:" {:header header :body body})
+    @(s/put! s header-s)
+    (cond
+      (not (nil? utf8)) @(s/put! s utf8)
+      (not (nil? bytes)) @(s/put! s-bytes (byte-array bytes))
+      :else true)))
+
+(defn handle-error-response [e s s-bytes msg]
+  (log/error e)
+  (write-response
+   s
+   s-bytes
+   {:header (headers/permanent-failure msg)
+    :body {}})
+  (s/close! s)
+  (s/close! s-bytes))
 
 (defn wrap-tcp-stream
   "Returns a tcp-stream handler. Takes a `gemini-req-handler` which the stream handler will pass
   gemini requests to."
   [gemini-req-handler {:keys [public-path]}]
-  (fn [s info]
+  (fn [s s-bytes info]
     (log/debug (emphasize "start"))
     (log/debug (str "Connection established with [" (:remote-addr info)) "]")
 
@@ -80,7 +93,7 @@
              {:maybe-uri maybe-uri
               :result (when-not (nil? gemini-res)
                         (log/debug "Successfully handled request")
-                        (write-response s gemini-res))})
+                        (write-response s s-bytes gemini-res))})
 
            ;; close the connection on success
            (fn [{:keys [maybe-uri result]}]
@@ -88,7 +101,8 @@
              (when result
                (do
                  (log/debug (emphasize "end"))
-                 (s/close! s)))
+                 (s/close! s)
+                 (s/close! s-bytes)))
              (when (and (not result) (not= maybe-uri ::none))
                (d/recur maybe-uri))))
 
@@ -97,18 +111,10 @@
           (d/catch
            TimeoutException
            (fn [e]
-             (log/error e)
-             (write-response s {:header
-                                (headers/to-str
-                                 (headers/permanent-failure "The request has timed out"))})
-             (s/close! s)))
+             (handle-error-response e s s-bytes "The request has timed out")))
           (d/catch
            (fn [e]
-             (log/error e)
-             (write-response s {:header
-                                (headers/to-str
-                                 (headers/permanent-failure "An unknown error occurred"))})
-             (s/close! s)))))))
+             (handle-error-response e s s-bytes "An unknown error occurred")))))))
 
 (defn- server->ssl-context
   [{:keys [key cert]}]
@@ -125,6 +131,7 @@
    (fn [s info]
      (tcp-stream-handler
       (wrap-duplex-stream protocol s)
+      s
       info))
    {:port port
     :ssl-context (server->ssl-context ssl-config)}))

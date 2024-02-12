@@ -47,7 +47,6 @@
 
 (defn file-ext
   [path]
-  (println "PATH" path)
   (let [resource-name (s/lower-case (last (s/split path #"/")))]
     (condp (fn [ext v] (s/ends-with? v ext)) resource-name
       "gmi" :gemini
@@ -57,35 +56,41 @@
       "txt" :text
       :gemini)))
 
-(defn get-mime-type
-  [path]
-  (get mime-types (file-ext path)))
+(defn gemini-response
+  [file-path]
+  (try
+    {:header (headers/success (:gemini mime-types))
+     :body {:utf8 (slurp file-path)}}
+    (catch
+     Exception
+     e
+      (log/error "could not handle gemini response:" e)
+      {:header (headers/permanent-failure)
+       :body {}})))
 
-(defn get-file-body [file-path]
-  (condp = (file-ext file-path)
-    (slurp file-path)))
+(defn file-response
+  [file-path ext]
+  (try
+    {:header (headers/success (ext mime-types))
+     :body {:bytes (slurp-bytes file-path)}}
+    (catch
+     Exception
+     e
+      (log/error "could not handle gemini response:" e)
+      {:header (headers/permanent-failure)
+       :body {}})))
+
+(defn- handle-resource-req [req {:keys [public-path] :as _opts}]
+  (let [file-path (resolve-file-path (:path req) public-path)
+        ext (file-ext file-path)]
+    (condp = ext
+      :gemini (gemini-response file-path)
+      (file-response file-path ext))))
 
 ; TODO: Not-implemented
 (defn- handle-input-req [_req & _opts]
   {:header (headers/input)
    :body nil})
-
-; TODO: Not-implemented
-(defn- handle-resource-req [req {:keys [public-path] :as _opts}]
-  (try
-    (let [file-path (resolve-file-path (:path req) public-path)
-          header (headers/success file-path)]
-          ; body (get-file-body (resolve-file-path path public-path))])
-      (println "header" header)
-      {:header header})
-      ; {:header headers
-      ;  :body body})
-    (catch
-     Exception
-     e
-      (println "Error handling request:" e)
-      {:header (headers/not-found)
-       :body nil})))
 
 ; TODO: Not-implemented
 (defn- handle-client-certificates-req [_req & _opts]
@@ -100,7 +105,5 @@
 (defn handle!
   "Handles a gemini request, returns a gemini response"
   [req opts]
-  (let [handler-fn (get req-handlers (handler-type (:path req)))
-        res (handler-fn req opts)]
-    {:header (headers/to-str (:header res))
-     :body (:body res)}))
+  (let [handler-fn (get req-handlers (handler-type (:path req)))]
+    (handler-fn req opts)))
