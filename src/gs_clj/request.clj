@@ -33,7 +33,7 @@
   (let [path (condp = uri-path
                "/" "/index.gmi"
                uri-path)]
-    (str public-path path)))
+    (s/replace (str public-path path) #".." "")))
 
 ; TODO: Not implemented
 (defn- handler-type
