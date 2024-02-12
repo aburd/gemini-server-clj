@@ -17,7 +17,7 @@
   (gloss/compile-frame
    (gloss/string :utf-8)))
 
-(defn- wrap-duplex-stream
+(defn wrap-duplex-stream
   [protocol s]
   (let [out (s/stream)]
     (s/connect

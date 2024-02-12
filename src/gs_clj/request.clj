@@ -45,22 +45,25 @@
     false :client-certifiates
     :else :resource))
 
+(defn file-ext
+  [path]
+  (let [resource-name (s/lower-case (last (s/split path #"/")))]
+    (condp (fn [ext v] (s/ends-with? v ext)) resource-name
+      "gmi" :gemini
+      "png" :png
+      "jpg" :jpeg
+      "jpeg" :jpeg
+      "txt" :text
+      :gemini)))
+
 (defn get-mime-type
   [path]
-  (println "path:" path)
-  (let [resource-name (s/lower-case (last (s/split path #"/")))
-        ext (condp (fn [ext v] (s/ends-with? v ext)) resource-name
-              "gmi" :gemini
-              "png" :png
-              "txt" :text
-              :gemini)]
-    (get mime-types ext)))
+  (get mime-types (file-ext path)))
 
-(s/lower-case (last (s/split "/pictures/joey-cig.png" #"/")))
-
-(defn- get-file-body [file-path]
-  (condp = (get-mime-type file-path)
+(defn get-file-body [file-path]
+  (condp = (file-ext file-path)
     :png (slurp-bytes file-path)
+    :jpeg (slurp-bytes file-path)
     (slurp file-path)))
 
 ; TODO: Not-implemented

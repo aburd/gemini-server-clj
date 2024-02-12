@@ -35,4 +35,5 @@
 
 (def mime-types {:gemini "text/gemini; charset=utf-8"
                  :text "text/plain; charset=utf-8"
-                 :png "media/png"})
+                 :png "media/png"
+                 :jpeg "media/jpeg"})
