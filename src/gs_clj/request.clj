@@ -62,7 +62,7 @@
                  :png "media/png"
                  :jpeg "media/jpeg"})
 
-(defn gemini-response
+(defn text-response
   [file-path]
   (try
     {:header (headers/success (:gemini mime-types))
@@ -92,7 +92,8 @@
   (let [file-path (resolve-file-path (:path req) public-path)
         ext (file-ext file-path)]
     (condp = ext
-      :gemini (gemini-response file-path)
+      :gemini (text-response file-path)
+      :text (text-response file-path)
       (file-response file-path ext))))
 
 ; TODO: Not-implemented

@@ -35,17 +35,25 @@
   (testing "valid uris return non-nil"
     (is (every? (comp not nil?) (map from-str valid-uris)))))
 
+(defn req [path]
+  (let [r (from-str (str "gemini://localhost" path clrf))]
+    (handle! r {:public-path "resources/test-public"})))
+
 (deftest handle-gem-req
-  (let [req (from-str (str "gemini://localhost" clrf))
-        res (handle! req {:public-path "resources/test-public"})]
+  (let [res (req "/")]
+    (is (= (get-in res [:header :status]) :success))
+    (is (string? (get-in res [:body :utf8])))))
+
+(deftest handle-text-req
+  (let [res (req "/hey.txt")]
+    (is (= (get-in res [:header :status]) :success))
     (is (string? (get-in res [:body :utf8])))))
 
 (deftest handle-png-req
-  (let [req (from-str (str "gemini://localhost/pictures/small.png" clrf))
-        res (handle! req {:public-path "resources/test-public"})]
+  (let [res (req "/pictures/small.png")]
+    (is (= (get-in res [:header :status]) :success))
     (is (bytes? (get-in res [:body :bytes])))))
 
 (deftest handle-no-path-traversal
-  (let [req (from-str (str "gemini://localhost/../certs/app.key" clrf))
-        res (handle! req {:public-path "resources/test-public"})]
+  (let [res (req "/../certs/app.key")]
     (is (= (get-in res [:header :status]) :permanent-failure))))
