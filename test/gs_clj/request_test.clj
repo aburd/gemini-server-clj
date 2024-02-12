@@ -1,6 +1,6 @@
 (ns gs-clj.request-test
   (:require [clojure.test :refer [deftest testing is]]
-            [gs-clj.request :refer [from-str]]
+            [gs-clj.request :refer [from-str handle! from-str]]
             [gs-clj.gemini :refer [clrf max-request-bytes]]))
 
 (def invalid-uris
@@ -34,3 +34,13 @@
 (deftest from-str-gemini
   (testing "valid uris return non-nil"
     (is (every? (comp not nil?) (map from-str valid-uris)))))
+
+(deftest handle-gem-req
+  (let [req (from-str (str "gemini://localhost" clrf))
+        res (handle! req {:public-path "resources/test-public"})]
+    (is (string? (get-in res [:body :utf8])))))
+
+(deftest handle-png-req
+  (let [req (from-str (str "gemini://localhost/pictures/small.png" clrf))
+        res (handle! req {:public-path "resources/test-public"})]
+    (is (bytes? (get-in res [:body :bytes])))))
