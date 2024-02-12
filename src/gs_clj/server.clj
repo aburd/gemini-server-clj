@@ -34,8 +34,9 @@
   (let [{:keys [header body]} res]
     (log/debug {:header header :body body})
     @(s/put! s header)
-    (when-not (nil? body)
-      @(s/put! s body))))
+    (if (not (nil? body))
+      @(s/put! s body)
+      true)))
 
 (defn wrap-tcp-stream
   "Returns a tcp-stream handler. Takes a `gemini-req-handler` which the stream handler will pass

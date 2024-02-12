@@ -47,6 +47,7 @@
 
 (defn file-ext
   [path]
+  (println "PATH" path)
   (let [resource-name (s/lower-case (last (s/split path #"/")))]
     (condp (fn [ext v] (s/ends-with? v ext)) resource-name
       "gmi" :gemini
@@ -62,8 +63,6 @@
 
 (defn get-file-body [file-path]
   (condp = (file-ext file-path)
-    :png (slurp-bytes file-path)
-    :jpeg (slurp-bytes file-path)
     (slurp file-path)))
 
 ; TODO: Not-implemented
@@ -72,12 +71,15 @@
    :body nil})
 
 ; TODO: Not-implemented
-(defn- handle-resource-req [{:keys [path] :as _req} {:keys [public-path] :as _opts}]
+(defn- handle-resource-req [req {:keys [public-path] :as _opts}]
   (try
-    (let [headers (headers/success (get-mime-type path))
-          body (get-file-body (resolve-file-path path public-path))]
-      {:header headers
-       :body body})
+    (let [file-path (resolve-file-path (:path req) public-path)
+          header (headers/success file-path)]
+          ; body (get-file-body (resolve-file-path path public-path))])
+      (println "header" header)
+      {:header header})
+      ; {:header headers
+      ;  :body body})
     (catch
      Exception
      e

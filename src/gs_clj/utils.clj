@@ -29,5 +29,3 @@
                 out (java.io.ByteArrayOutputStream.)]
       (io/copy in out)
       (.toByteArray out))))
-
-(slurp-bytes "resources/public/pictures/joey-cig.png")
