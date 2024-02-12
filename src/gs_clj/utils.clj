@@ -1,5 +1,6 @@
 (ns gs-clj.utils
-  (:require [clojure.string :as string]))
+  (:require [clojure.string :as string]
+            [clojure.java.io :as io]))
 
 (defn emphasize
   [s & {:keys [len c] :or {len 20 c '*}}]
@@ -20,3 +21,13 @@
   "return a sequence of the vals at the keys of the provided map"
   [m & ks]
   (vals (select-keys m ks)))
+
+(defn slurp-bytes
+  [^String path]
+  (when (.exists (io/file path))
+    (with-open [in (io/input-stream path)
+                out (java.io.ByteArrayOutputStream.)]
+      (io/copy in out)
+      (.toByteArray out))))
+
+(slurp-bytes "resources/public/pictures/joey-cig.png")

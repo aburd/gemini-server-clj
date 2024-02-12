@@ -4,7 +4,7 @@
    [taoensso.timbre :as log]
    [gs-clj.gemini :refer [clrf max-request-bytes mime-types]]
    [gs-clj.headers :as headers]
-   [gs-clj.utils :refer [byte-len-within pick]]
+   [gs-clj.utils :refer [byte-len-within pick slurp-bytes]]
    [lambdaisland.uri :as uri]))
 
 (defn- is-ip-address? [s]
@@ -35,10 +35,6 @@
                uri-path)]
     (str public-path path)))
 
-(defn- get-file-body [file-path]
-  (log/debug "Getting file at:", file-path)
-  (slurp file-path))
-
 ; TODO: Not implemented
 (defn- handler-type
   "get the general class of response handler type"
@@ -49,6 +45,24 @@
     false :client-certifiates
     :else :resource))
 
+(defn get-mime-type
+  [path]
+  (println "path:" path)
+  (let [resource-name (s/lower-case (last (s/split path #"/")))
+        ext (condp (fn [ext v] (s/ends-with? v ext)) resource-name
+              "gmi" :gemini
+              "png" :png
+              "txt" :text
+              :gemini)]
+    (get mime-types ext)))
+
+(s/lower-case (last (s/split "/pictures/joey-cig.png" #"/")))
+
+(defn- get-file-body [file-path]
+  (condp = (get-mime-type file-path)
+    :png (slurp-bytes file-path)
+    (slurp file-path)))
+
 ; TODO: Not-implemented
 (defn- handle-input-req [_req & _opts]
   {:header (headers/input)
@@ -56,8 +70,17 @@
 
 ; TODO: Not-implemented
 (defn- handle-resource-req [{:keys [path] :as _req} {:keys [public-path] :as _opts}]
-  {:header (headers/success (:gemini mime-types))
-   :body (get-file-body (resolve-file-path path public-path))})
+  (try
+    (let [headers (headers/success (get-mime-type path))
+          body (get-file-body (resolve-file-path path public-path))]
+      {:header headers
+       :body body})
+    (catch
+     Exception
+     e
+      (println "Error handling request:" e)
+      {:header (headers/not-found)
+       :body nil})))
 
 ; TODO: Not-implemented
 (defn- handle-client-certificates-req [_req & _opts]

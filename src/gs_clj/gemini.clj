@@ -34,4 +34,5 @@
                :certificate-not-valid 62})
 
 (def mime-types {:gemini "text/gemini; charset=utf-8"
-                 :text "text/plain; charset=utf-8"})
+                 :text "text/plain; charset=utf-8"
+                 :png "media/png"})
