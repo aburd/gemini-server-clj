@@ -40,13 +40,13 @@ CLI opts will override config file if you pass them in.
 ```clojure
 (require '[gs-clj.server :as server])
 
-(defn handler [req]
+(defn handler [req opts]
   {:header {:status :success    ; or just use :code
             :code 20            ; or just use :header
             :meta "text/gemini"
    :body {:utf8 "hello gemini!"})
 
-(defn img-handler [req]
+(defn img-handler [req opts]
   {:header {:status :success    ; or just use :code
             :code 20            ; or just use :header
             :meta "image/png"
@@ -55,6 +55,10 @@ CLI opts will override config file if you pass them in.
 ; TODO: how to config ssl-certs
 (server/start! handler {:port 1965})
 ```
+
+`req` has various uri information, basically what you'd find in a [lambdaisland/uri](https://cljdoc.org/d/lambdaisland/uri/1.19.155/api/lambdaisland.uri) response, sans the things not in the gemini spec. 
+
+`opts` contains public-path info.
 
 ## License
 
