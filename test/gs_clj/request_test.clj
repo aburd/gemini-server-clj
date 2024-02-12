@@ -44,3 +44,8 @@
   (let [req (from-str (str "gemini://localhost/pictures/small.png" clrf))
         res (handle! req {:public-path "resources/test-public"})]
     (is (bytes? (get-in res [:body :bytes])))))
+
+(deftest handle-no-path-traversal
+  (let [req (from-str (str "gemini://localhost/../certs/app.key" clrf))
+        res (handle! req {:public-path "resources/test-public"})]
+    (is (= (get-in res [:header :status]) :permanent-failure))))

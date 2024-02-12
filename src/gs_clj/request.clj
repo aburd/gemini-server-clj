@@ -2,7 +2,7 @@
   (:require
    [clojure.string :as s]
    [taoensso.timbre :as log]
-   [gs-clj.gemini :refer [clrf max-request-bytes mime-types]]
+   [gs-clj.gemini :refer [clrf max-request-bytes]]
    [gs-clj.headers :as headers]
    [gs-clj.utils :refer [byte-len-within pick slurp-bytes]]
    [lambdaisland.uri :as uri]))
@@ -33,15 +33,16 @@
   (let [path (condp = uri-path
                "/" "/index.gmi"
                uri-path)]
-    (s/replace (str public-path path) #".." "")))
+    ; Do not allow path traversal in fs
+    (s/replace (str public-path path) ".." "")))
 
 ; TODO: Not implemented
+; only handle resources for now, input can happen later
 (defn- handler-type
   "get the general class of response handler type"
   [^String path]
   (cond
     false :input
-    ; TODO; not sure
     false :client-certifiates
     :else :resource))
 
@@ -56,6 +57,11 @@
       "txt" :text
       :gemini)))
 
+(def mime-types {:gemini "text/gemini; charset=utf-8"
+                 :text "text/plain; charset=utf-8"
+                 :png "media/png"
+                 :jpeg "media/jpeg"})
+
 (defn gemini-response
   [file-path]
   (try
@@ -65,6 +71,7 @@
      Exception
      e
       (log/error "could not handle gemini response:" e)
+      (log/error "FILE PATH" file-path)
       {:header (headers/permanent-failure)
        :body {}})))
 
@@ -77,6 +84,7 @@
      Exception
      e
       (log/error "could not handle gemini response:" e)
+      (log/error "FILE PATH" file-path "EXT" ext)
       {:header (headers/permanent-failure)
        :body {}})))
 
