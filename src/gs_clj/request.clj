@@ -2,6 +2,7 @@
   (:require
    [clojure.string :as s]
    [taoensso.timbre :as log]
+   [clojure.java.io :as io]
    [gs-clj.gemini :refer [clrf max-request-bytes]]
    [gs-clj.headers :as headers]
    [gs-clj.utils :refer [byte-len-within pick slurp-bytes]]
@@ -55,7 +56,7 @@
       "jpg" :jpeg
       "jpeg" :jpeg
       "txt" :text
-      :gemini)))
+      nil)))
 
 (def mime-types {:gemini "text/gemini; charset=utf-8"
                  :text "text/plain; charset=utf-8"
@@ -72,20 +73,25 @@
      e
       (log/error "could not handle gemini response:" e)
       (log/error "FILE PATH" file-path)
-      {:header (headers/permanent-failure)
+      {:header (headers/not-found)
        :body {}})))
 
 (defn file-response
   [file-path ext]
   (try
-    {:header (headers/success (ext mime-types))
-     :body {:bytes (slurp-bytes file-path)}}
+    (cond
+      (or (nil? ext) (not (.exists (io/file file-path))))
+      {:header (headers/not-found)
+       :body {}}
+      (not (nil? ext))
+      {:header (headers/success ext)
+       :body {:bytes (slurp-bytes file-path)}})
     (catch
      Exception
      e
       (log/error "could not handle gemini response:" e)
       (log/error "FILE PATH" file-path "EXT" ext)
-      {:header (headers/permanent-failure)
+      {:header (headers/not-found)
        :body {}})))
 
 (defn- handle-resource-req [req {:keys [public-path] :as _opts}]

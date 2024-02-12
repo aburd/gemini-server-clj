@@ -6,7 +6,7 @@ A gemini server written in Clojure built mostly on top of the wonderful [aleph](
 
 ### As a stand-alone Gemini Server
 
-For now, all it does is map the requests to the public path (default: `resources/public`).
+For now, all it does is map the requests to the public path (default: `resources/public`). Only handles gmi, txt, jpg, and png file types.
 
 You can use this project as a server through the CLI. 
 After cloning this repo, you'll need [leiningen](https://leiningen.org) to install the depedencies and run the server. After running `lein install`, use `lein run` for more information.

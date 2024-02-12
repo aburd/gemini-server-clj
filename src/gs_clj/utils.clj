@@ -24,8 +24,7 @@
 
 (defn slurp-bytes
   [^String path]
-  (when (.exists (io/file path))
-    (with-open [in (io/input-stream path)
-                out (java.io.ByteArrayOutputStream.)]
-      (io/copy in out)
-      (.toByteArray out))))
+  (with-open [in (io/input-stream path)
+              out (java.io.ByteArrayOutputStream.)]
+    (io/copy in out)
+    (.toByteArray out)))

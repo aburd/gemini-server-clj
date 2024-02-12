@@ -56,4 +56,16 @@
 
 (deftest handle-no-path-traversal
   (let [res (req "/../certs/app.key")]
-    (is (= (get-in res [:header :status]) :permanent-failure))))
+    (is (= (get-in res [:header :status]) :not-found))))
+
+(deftest handle-not-found-pic
+  (let [res (req "/does-not-exist.png")]
+    (is (= (get-in res [:header :status]) :not-found))))
+
+(deftest handle-not-found-txt
+  (let [res (req "/does-not-exist.txt")]
+    (is (= (get-in res [:header :status]) :not-found))))
+
+(deftest handle-bad-ext
+  (let [res (req "/pictures/small.wut")]
+    (is (= (get-in res [:header :status]) :not-found))))
